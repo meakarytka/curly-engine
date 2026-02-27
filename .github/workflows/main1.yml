@@ -1,4 +1,4 @@
-name: FREE_RDP
+name: RDP
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
         shell: powershell
         run: |
           $username = "RDP"
-          $password = "Passkiller"
+          $password = "P@sskiller"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
 
           if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
@@ -57,7 +57,7 @@ jobs:
         run: |
           Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1"
           Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUserName" -Value "RDP"
-          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultPassword" -Value "Passkiller"
+          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultPassword" -Value "P@sskiller"
 
       # ===============================
       # Install Tailscale
@@ -111,7 +111,7 @@ jobs:
           Write-Host " RDP READY"
           Write-Host " IP : $env:TAILSCALE_IP"
           Write-Host " USER : RDP"
-          Write-Host " PASS : Passkiller"
+          Write-Host " PASS : P@sskiller"
           Write-Host "=============================="
 
           while ($true) {
