@@ -35,7 +35,7 @@ jobs:
         shell: powershell
         run: |
           $username = "RDP"
-          $password = "Passkiller@123"
+          $password = "killer@123"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
 
           if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
@@ -57,7 +57,7 @@ jobs:
         run: |
           Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1"
           Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUserName" -Value "RDP"
-          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultPassword" -Value "Passkiller@123"
+          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultPassword" -Value "killer@123"
 
       # ===============================
       # Install Tailscale
@@ -111,7 +111,7 @@ jobs:
           Write-Host " RDP READY"
           Write-Host " IP : $env:TAILSCALE_IP"
           Write-Host " USER : RDP"
-          Write-Host " PASS : Passkiller@123"
+          Write-Host " PASS : killer@123"
           Write-Host "=============================="
 
           while ($true) {
