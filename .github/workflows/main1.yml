@@ -1,0 +1,119 @@
+name: FREE_RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      # ===============================
+      # Enable RDP + Clipboard + File Transfer
+      # ===============================
+      - name: Configure RDP + Clipboard + File Transfer
+        shell: pwsh
+        run: |
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+
+          New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -Force | Out-Null
+          Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -Name "fDisableClip" -Value 0 -Force
+          Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -Name "fDisableCdm" -Value 0 -Force
+
+          netsh advfirewall firewall delete rule name="RDP" >$null 2>&1
+          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
+
+          Restart-Service TermService -Force
+
+      # ===============================
+      # Create RDP User (FIXED)
+      # ===============================
+      - name: Create RDP User
+        shell: powershell
+        run: |
+          $username = "RDP"
+          $password = "Passkiller"
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+
+          if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
+              Remove-LocalUser -Name $username
+          }
+
+          New-LocalUser -Name $username -Password $securePass -AccountNeverExpires
+          Add-LocalGroupMember -Group "Administrators" -Member $username
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member $username
+
+          Add-Content $env:GITHUB_ENV "RDP_USER=$username"
+          Add-Content $env:GITHUB_ENV "RDP_PASS=$password"
+
+      # ===============================
+      # Enable Auto Login
+      # ===============================
+      - name: Enable Auto-Login
+        shell: powershell
+        run: |
+          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "AutoAdminLogon" -Value "1"
+          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultUserName" -Value "RDP"
+          Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "DefaultPassword" -Value "Passkiller"
+
+      # ===============================
+      # Install Tailscale
+      # ===============================
+      - name: Install Tailscale
+        shell: pwsh
+        run: |
+          $url = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          $msi = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest $url -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /quiet /norestart" -Wait
+          Remove-Item $msi -Force
+
+      # ===============================
+      # Connect Tailscale
+      # ===============================
+      - name: Connect to Tailscale
+        shell: pwsh
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=$env:TAILSCALE_AUTH_KEY --hostname=gh-rdp-$env:GITHUB_RUN_ID
+
+          for ($i=0; $i -lt 10; $i++) {
+            $ip = (& "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4 | Select-Object -First 1).Trim()
+            if ($ip) { break }
+            Start-Sleep 5
+          }
+
+          if (-not $ip) { throw "No Tailscale IP" }
+
+          Add-Content $env:GITHUB_ENV "TAILSCALE_IP=$ip"
+
+      # ===============================
+      # Verify RDP Port
+      # ===============================
+      - name: Verify RDP
+        shell: pwsh
+        run: |
+          if (!(Test-NetConnection $env:TAILSCALE_IP -Port 3389).TcpTestSucceeded) {
+            throw "RDP port closed"
+          }
+
+      # ===============================
+      # Keep Runner Alive
+      # ===============================
+      - name: Keep Runner Alive
+        shell: pwsh
+        run: |
+          Write-Host "=============================="
+          Write-Host " RDP READY"
+          Write-Host " IP : $env:TAILSCALE_IP"
+          Write-Host " USER : RDP"
+          Write-Host " PASS : Passkiller"
+          Write-Host "=============================="
+
+          while ($true) {
+            Start-Sleep 300
+          }
